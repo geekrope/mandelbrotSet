@@ -55,13 +55,19 @@ var ComputingEngine = /** @class */ (function () {
 var Transform = /** @class */ (function () {
     function Transform() {
     }
-    Transform.computeFromMatrix = function (transformedPoint, matrix) {
+    Transform.computePointFromMatrix = function (transformedPoint, matrix) {
         var x = (-matrix.c * matrix.f + matrix.c * transformedPoint.y + matrix.d * matrix.e - matrix.d * transformedPoint.x) / (matrix.b * matrix.c - matrix.a * matrix.d);
         var y = (-matrix.b * matrix.e + matrix.b * transformedPoint.x + matrix.a * matrix.f - matrix.a * transformedPoint.y) / (matrix.b * matrix.c - matrix.a * matrix.d);
         return new DOMPoint(x, y);
     };
-    Transform.computeMatrix = function (relativePoint, scale) {
-        return new DOMMatrix([scale, 0, 0, scale, relativePoint.x * (1 - scale), relativePoint.y * (1 - scale)]);
+    Transform.computeRectangleFromMatrix = function (transformedRectangle, matrix) {
+        var edge1 = Transform.computePointFromMatrix(new DOMPoint(transformedRectangle.x, transformedRectangle.y), matrix);
+        var edge2 = Transform.computePointFromMatrix(new DOMPoint(transformedRectangle.x2, transformedRectangle.y2), matrix);
+        return { x: edge1.x, y: edge1.y, x2: edge2.x, y2: edge2.y };
+    };
+    Transform.computeMatrix = function (relativePoint, previousTransform, scale) {
+        var originalPoint = Transform.computePointFromMatrix(relativePoint, previousTransform);
+        return new DOMMatrix([scale, 0, 0, scale, originalPoint.x * (1 - scale) + relativePoint.x, originalPoint.y * (1 - scale) + relativePoint.y]);
     };
     return Transform;
 }());
@@ -76,27 +82,25 @@ var mandelbrotSet = function (itterations, point) {
     }
     return belongs;
 };
-function draw(ctx, transform, scale) {
-    var frameEdge1 = Transform.computeFromMatrix(new DOMPoint(0, 0), transform);
-    var frameEdge2 = Transform.computeFromMatrix(new DOMPoint(1920, 1080), transform);
-    ctx.clearRect(frameEdge1.x, frameEdge1.y, frameEdge2.x - frameEdge1.x, frameEdge2.y - frameEdge1.y);
-    var points = ComputingEngine.computeFractalPoints(mandelbrotSet, 1 / scale, 10, { x: -2, y: -2, x2: 2, y2: 2 });
-    points.forEach(function (point) { ctx.fillRect(point.real, point.imaginary, 1 / scale, 1 / scale); });
+function draw(ctx, points, transform) {
+    var frame = Transform.computeRectangleFromMatrix({ x: 0, y: 0, x2: 1920, y2: 1080 }, transform);
+    ctx.clearRect(frame.x, frame.y, frame.x2 - frame.x, frame.y2 - frame.y);
+    points.forEach(function (point) { ctx.fillRect(point.real, point.imaginary, 1 / transform.a, 1 / transform.d); });
 }
 window.onload = function () {
     var cnvs = document.getElementById("cnvs");
     var ctx = cnvs.getContext("2d");
     var scale = 100;
     var transform = new DOMMatrix([scale, 0, 0, scale, 500, 500]);
+    var points = ComputingEngine.computeFractalPoints(mandelbrotSet, 1 / scale, 10, { x: -2, y: -2, x2: 2, y2: 2 });
     ctx.setTransform(transform);
-    draw(ctx, transform, scale);
+    draw(ctx, points, transform);
     cnvs.onmousedown = function (e) {
         scale += 100;
-        transform = Transform.computeMatrix(Transform.computeFromMatrix(new DOMPoint(e.x, e.y), transform), scale);
-        transform.e += e.x;
-        transform.f += e.y;
+        transform = Transform.computeMatrix(new DOMPoint(e.x, e.y), transform, scale);
+        points = ComputingEngine.computeFractalPoints(mandelbrotSet, 1 / scale, 10, { x: -2, y: -2, x2: 2, y2: 2 });
         ctx.setTransform(transform);
-        draw(ctx, transform, scale);
+        draw(ctx, points, transform);
     };
 };
 //# sourceMappingURL=app.js.map

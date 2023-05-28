@@ -64,16 +64,25 @@ class ComputingEngine
 
 class Transform
 {
-	public static computeFromMatrix(transformedPoint: DOMPoint, matrix: DOMMatrix): DOMPoint
+	public static computePointFromMatrix(transformedPoint: DOMPoint, matrix: DOMMatrix): DOMPoint
 	{
 		const x = (-matrix.c * matrix.f + matrix.c * transformedPoint.y + matrix.d * matrix.e - matrix.d * transformedPoint.x) / (matrix.b * matrix.c - matrix.a * matrix.d);
 		const y = (-matrix.b * matrix.e + matrix.b * transformedPoint.x + matrix.a * matrix.f - matrix.a * transformedPoint.y) / (matrix.b * matrix.c - matrix.a * matrix.d)
 
 		return new DOMPoint(x, y);
 	}
-	public static computeMatrix(relativePoint: DOMPoint, scale: number)
+	public static computeRectangleFromMatrix(transformedRectangle: rectangle, matrix: DOMMatrix)
 	{
-		return new DOMMatrix([scale, 0, 0, scale, relativePoint.x * (1 - scale), relativePoint.y * (1 - scale)]);
+		const edge1 = Transform.computePointFromMatrix(new DOMPoint(transformedRectangle.x, transformedRectangle.y), matrix);
+		const edge2 = Transform.computePointFromMatrix(new DOMPoint(transformedRectangle.x2, transformedRectangle.y2), matrix);
+
+		return { x: edge1.x, y: edge1.y, x2: edge2.x, y2: edge2.y };
+	}
+	public static computeMatrix(relativePoint: DOMPoint, previousTransform: DOMMatrix, scale: number)
+	{
+		const originalPoint = Transform.computePointFromMatrix(relativePoint, previousTransform);
+
+		return new DOMMatrix([scale, 0, 0, scale, originalPoint.x * (1 - scale) + relativePoint.x, originalPoint.y * (1 - scale) + relativePoint.y]);
 	}
 }
 
@@ -95,16 +104,13 @@ const mandelbrotSet: belongsToFractal = (itterations: number, point: ComplexNumb
 	return belongs;
 }
 
-function draw(ctx: CanvasRenderingContext2D, transform: DOMMatrix, scale)
+function draw(ctx: CanvasRenderingContext2D, points: ComplexNumber[], transform: DOMMatrix)
 {
-	const frameEdge1 = Transform.computeFromMatrix(new DOMPoint(0, 0), transform);
-	const frameEdge2 = Transform.computeFromMatrix(new DOMPoint(1920, 1080), transform);
+	const frame = Transform.computeRectangleFromMatrix({ x: 0, y: 0, x2: 1920, y2: 1080 }, transform);
 
-	ctx.clearRect(frameEdge1.x, frameEdge1.y, frameEdge2.x - frameEdge1.x, frameEdge2.y - frameEdge1.y);
+	ctx.clearRect(frame.x, frame.y, frame.x2 - frame.x, frame.y2 - frame.y);
 
-	const points = ComputingEngine.computeFractalPoints(mandelbrotSet, 1 / scale, 10, { x: - 2, y: -2, x2: 2, y2: 2 });
-
-	points.forEach((point) => { ctx.fillRect(point.real, point.imaginary, 1 / scale, 1 / scale) });
+	points.forEach((point) => { ctx.fillRect(point.real, point.imaginary, 1 / transform.a, 1 / transform.d) });
 }
 
 window.onload = () =>
@@ -114,21 +120,21 @@ window.onload = () =>
 
 	let scale = 100;
 	let transform = new DOMMatrix([scale, 0, 0, scale, 500, 500]);
+	let points = ComputingEngine.computeFractalPoints(mandelbrotSet, 1 / scale, 10, { x: - 2, y: -2, x2: 2, y2: 2 });
 
 	ctx.setTransform(transform);
 
-	draw(ctx, transform, scale);
+	draw(ctx, points, transform);
 
 	cnvs.onmousedown = (e) =>
 	{
 		scale += 100;
 
-		transform = Transform.computeMatrix(Transform.computeFromMatrix(new DOMPoint(e.x, e.y), transform), scale);
+		transform = Transform.computeMatrix(new DOMPoint(e.x, e.y), transform, scale);
 
-		transform.e += e.x;
-		transform.f += e.y;
+		points = ComputingEngine.computeFractalPoints(mandelbrotSet, 1 / scale, 10, { x: - 2, y: -2, x2: 2, y2: 2 });
 
 		ctx.setTransform(transform);
-		draw(ctx, transform, scale);
+		draw(ctx, points, transform);
 	}
 }
