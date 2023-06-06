@@ -97,14 +97,14 @@ class Transform
 
 		return { x: edge1.x, y: edge1.y, x2: edge2.x, y2: edge2.y };
 	}
-	public static computeScaleMatrix(relativePoint: DOMPoint, previousTransform: DOMMatrix, scale: number)
+	public static computeScaleMatrix(relativePoint: DOMPoint, previousTransform: DOMMatrix, scale: number): DOMMatrix
 	{
 		const originalPoint = Transform.computePointFromMatrix(relativePoint, previousTransform);
 
 		return new DOMMatrix([scale, 0, 0, scale, originalPoint.x * (1 - scale) + relativePoint.x, originalPoint.y * (1 - scale) + relativePoint.y]);
 	}
 
-	public static transformRectangle(rectangle: Rectangle, matrix: DOMMatrix)
+	public static transformRectangle(rectangle: Rectangle, matrix: DOMMatrix): Rectangle
 	{
 		const edge1 = matrix.transformPoint(new DOMPoint(rectangle.x, rectangle.y));
 		const edge2 = matrix.transformPoint(new DOMPoint(rectangle.x2, rectangle.y2));
